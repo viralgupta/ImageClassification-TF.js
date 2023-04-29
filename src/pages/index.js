@@ -1,118 +1,105 @@
-import Image from 'next/image'
 import { Inter } from 'next/font/google'
+import * as mobilenet from "@tensorflow-models/mobilenet"
+import { useEffect, useRef, useState } from 'react'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export default function Home() {
-  return (
-    <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
-    >
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/pages/index.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+  const [ismodelloading, setIsmodelloading] = useState(false)
+  const [model, setModel] = useState(null)
+  const [imgurl, setImgurl] = useState(null)
+  const [mresults, setMresults] = useState(null)
+  const [guessing, setguessing] = useState(false)
+  const [timetaken, settimetaken] = useState(0)
+  const imgref = useRef()
+  const imgurlref = useRef()
+  const loadModel = async () => {
+    setIsmodelloading(true)
+    try {
+      const model = await mobilenet.load()
+      setModel(model)
+      setIsmodelloading(false)
+    } catch (error) {
+      console.log(error)
+      console.log('error loading model')
+      setIsmodelloading(false)
+    }
+  }
+  const uploadimage = async (e) => {
+    const { files } = e.target
+    if (files.length > 0) {
+      const url = URL.createObjectURL(files[0])
+      setImgurl(url)
+      setMresults(null)
+      setguessing(true)
+    }
+  }
+  const uploadurl = async () => {
+    if (imgurlref.current.value.length > 0) {
+      console.log('running')
+      setImgurl(imgurlref.current.value)
+      setMresults(null)
+      imgurlref.current.value = ''
+    }
+  }
+  const identify = async () => {
+    let start = Date.now()
+    setguessing(true)
+    const results = await model.classify(imgref.current)
+    setguessing(false)
+    let tt = Date.now() - start
+    settimetaken(tt)
+    setMresults(results)
+  }
+  useEffect(() => {
+    loadModel()
+  }, [])
+
+  if (ismodelloading) {
+    return <h2 className='text-center text-2xl'>Model Loading...</h2>
+  }
+
+
+  return (<>
+    <div className='container m-auto w-4/5 h-[100vh]'>
+      <div className=' mx-auto p-2 py-8 text-2xl flex flex-row justify-center items-center'>TensorFlow Image Classification Model Usage <img src="https://www.vectorlogo.zone/logos/tensorflow/tensorflow-icon.svg" alt="https://www.vectorlogo.zone/logos/tensorflow/tensorflow-icon.svg" className='w-10' /></div>
+
+      <div className='inputholder flex space-x-3 justify-center'>
+        <div className='p-1 m-0 border-2'>
+        <input type="file" accept='image/*' capture="camera" className='uploadinput p-1 rounded-sm hover:cursor-pointer' onChange={uploadimage} />
+        </div>
+        <div className="flex space-x-2 border-2 items-center p-2">
+          <input type="url" className='uploadinput h-8 rounded-sm bg-gray-900' ref={imgurlref} /><button className=' rounded-md  bg-gray-700 disabled:text-gray-300 text-lg px-1' onClick={uploadurl}>Upload Image Url</button>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
+      <div className="mainWrapper flex-col">
+        <div className="mainContent flex items-center">
+          <div className="imageHolder">
+            {imgurl && <img src={imgurl} alt="Upload Preview" crossOrigin='anonymous' ref={imgref} className='m-5 mt-10 rounded-md h-96' />}
+          </div>
+          <div>
+            {mresults ? <div className='space-y-3'>
+              <div className="first bg-blue-600 text-xl p-2 rounded-md">
+                <div className='font-bold text-3xl'>Best Guess: {(mresults[0].className).toUpperCase()}</div>
+                <div className=''>Confidence: {(mresults[0].probability * 100)} &#37;</div>
+              </div>
+              <div className="first bg-blue-600 text-xl p-2 rounded-md">
+                <div className=''>Second best guess: {(mresults[1].className).toUpperCase()}</div>
+                <div className=''>Confidence: {(mresults[1].probability * 100)} &#37;</div>
+              </div>
+              <div className="first bg-blue-600 text-xl p-2 rounded-md">
+                <div className=''>Third best guess: {(mresults[2].className).toUpperCase()}</div>
+                <div className=''>Confidence: {(mresults[2].probability * 100)} &#37;</div>
+              </div>
+              <div className="first bg-blue-200 text-xl p-2 rounded-md">
+                <div className='text-black'>Time Taken: <span className='font-bold'>{timetaken}ms</span></div>
+              </div>
+            </div>: guessing && <div className='text-3xl'>Identifying...</div>}
+          </div>
+        </div>
+        {imgurl && <button className='p-3 bg-green-300 rounded-md text-black h-min ml-5' onClick={identify}>Identify Image</button>}
       </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
+  </>
   )
 }
